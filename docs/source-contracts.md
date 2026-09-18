@@ -1,5 +1,7 @@
 # API 文档分析与来源
 
+2026-09-18 Manage adapter 升级使用 `new-kovar-manage-api.json`；新版比较、源码依据与未确认项见 [manage-api-migration.md](manage-api-migration.md)。下面保留最初两份文档的清单作为历史基线。
+
 两个输入文件均完整解析；管理面和模型面分别使用对应原始文件。所有缺失字段保持显式，未借用其他部署的协议。
 
 ## kovar-manage-api.json

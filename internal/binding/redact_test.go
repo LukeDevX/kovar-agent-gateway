@@ -13,3 +13,12 @@ func TestSanitizeNestedCredentials(t *testing.T) {
 		t.Fatal("redaction leaked credentials or lost integer precision")
 	}
 }
+
+func TestSanitizeScalarAndExactDecimal(t *testing.T) {
+	if got := string(sanitize(json.RawMessage(`"fixture-session"`), "fixture-session")); got != `"[REDACTED]"` {
+		t.Fatal("scalar management data leaked a credential")
+	}
+	if got := string(sanitize(json.RawMessage(`{"money":9007199254740993.01}`))); got != `{"money":9007199254740993.01}` {
+		t.Fatal("topup money lost decimal precision")
+	}
+}

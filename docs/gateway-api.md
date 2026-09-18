@@ -32,9 +32,11 @@
 | DELETE | /api/v1/agent/token | Agent，先停止本地 Key 使用再删除上游 |
 | GET | /api/v1/account | Agent，User self 额度字段 |
 | GET | /api/v1/account/topup/info | Agent |
-| GET | /api/v1/account/topups | Agent，page/page_size |
-| POST | /api/v1/account/topup | Agent，provider/payload；Idempotency-Key；缺少协议时 NOT_SUPPORTED |
-| GET | /api/v1/models | Agent 专属 Key 的实际模型列表 |
+| GET | /api/v1/account/topups | Agent，page/page_size/keyword；使用上游分页和 total |
+| GET | /api/v1/account/topup/status | Agent，必填 trade_no；仅绑定用户的订单 |
+| GET | /api/v1/account/topup/axone/chains | Agent，Axone 支持的链 |
+| POST | /api/v1/account/topup | Agent，provider/payload；Idempotency-Key；新增 axone，其他 provider 仍 NOT_SUPPORTED |
+| GET | /api/v1/models | Agent 绑定用户的可用模型，响应仍为 `{data:[{id}]}` |
 | GET | /api/v1/pricing | Agent，管理 pricing data |
 | POST | /api/v1/tasks | Agent，task_type/model/payload；Idempotency-Key |
 | GET | /api/v1/tasks | Agent，page/page_size |
@@ -45,4 +47,16 @@
 
 管理列表与详情上的 today_usage/month_usage 是本地预算累计：实际值存在时用实际，否则用估算；不是 Kovar 扣款凭证。Model 任务已创建后即以 Task 表达执行失败，重放请求读取现有 Task；前置拒绝则返回 4xx/5xx。
 
-本项目不会转发任意上游 path 或 query。管理日志/充值历史 operation 未描述分页参数，Client 不擅自添加参数；受限大小的返回先在 Gateway 内分页。如果实际部署只返回上游默认一页，Gateway 无法猜测缺失的翻页协议，部署方需要补全文档。
+本项目不会转发任意上游 path、认证头或 query。充值历史仅发送 `p`（来自 Gateway `page`）、`page_size`、`keyword`，默认 1/20，page_size 最大 100；不再对上游返回页二次切片。trade_no、keyword 最大 256 字节，不接受控制字符。用户模型发现无需先创建模型 Key；任务执行仍要求专属 Key 和原有预算检查。
+
+Axone 创建示例（链、币种、钱包地址由用户根据 topup info/chains 明确选择，以下仅为占位）：
+
+```json
+{"provider":"axone","payload":{"amount":10,"currency":"USDC","chain_id":"SELECTED_CHAIN","payment_wallet_address":"SELECTED_WALLET"}}
+```
+
+创建只返回 pending 订单。查询 status 时原样返回 Kovar 的状态及金额，不将 paid/completed 等状态互相转换，不本地增加 quota。相同逻辑写操作重试须保持完全相同的 body 和 Idempotency-Key，并重新签名；上游不确定失败也不会重复创建订单。
+
+管理错误映射：400 `KOVAR_INVALID_REQUEST`，401 `KOVAR_AUTH_FAILED`，403 `KOVAR_FORBIDDEN`（包括 pricing 模块关闭），404 `KOVAR_NOT_FOUND`，409 `KOVAR_CONFLICT`，429 `UPSTREAM_RATE_LIMITED`，5xx → 502 `UPSTREAM_ERROR`。HTTP 200 业务失败 → 502 `KOVAR_REQUEST_REJECTED`；订单不存在或不属于当前用户 → 404。响应结构异常返回 502，不直接透出上游消息。
+
+日志分页维持现有行为，本次没有扩展日志过滤器；其上游分页适配可单独处理。

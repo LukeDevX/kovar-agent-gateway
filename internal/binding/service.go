@@ -394,9 +394,78 @@ func (s *Service) Pricing(ctx context.Context, a string) (json.RawMessage, error
 	if err != nil {
 		return nil, err
 	}
-	return s.manage.Pricing(ctx, c)
+	data, err := s.manage.Pricing(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
 }
+
+func (s *Service) Models(ctx context.Context, a string) ([]string, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := s.manage.Models(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(ids)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(s.sanitizeData(ctx, a, c, raw), &ids)
+	return ids, err
+}
+
+func (s *Service) Topups(ctx context.Context, a string, page, size int, keyword string) (json.RawMessage, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.manage.Topups(ctx, c, page, size, keyword)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
+}
+
+func (s *Service) TopupStatus(ctx context.Context, a, tradeNo string) (json.RawMessage, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.manage.TopupStatus(ctx, c, tradeNo)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
+}
+
+func (s *Service) AxoneChains(ctx context.Context, a string) (json.RawMessage, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.manage.AxoneChains(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
+}
+
+func (s *Service) sanitizeData(ctx context.Context, a string, c kovarmanage.Credential, data json.RawMessage) json.RawMessage {
+	secrets := []string{c.Session, c.AccessToken}
+	if key, _, err := s.Key(ctx, a); err == nil {
+		secrets = append(secrets, key, strings.TrimPrefix(key, "sk-"))
+	}
+	return sanitize(data, secrets...)
+}
+
 func (s *Service) Read(ctx context.Context, a, operation string, page, size int) (json.RawMessage, error) {
+	if operation == "topups" {
+		return s.Topups(ctx, a, page, size, "")
+	}
 	c, err := s.Credential(ctx, a)
 	if err != nil {
 		return nil, err
@@ -405,12 +474,8 @@ func (s *Service) Read(ctx context.Context, a, operation string, page, size int)
 	if err != nil {
 		return nil, err
 	}
-	secrets := []string{c.Session, c.AccessToken}
-	if key, _, e := s.Key(ctx, a); e == nil {
-		secrets = append(secrets, key, strings.TrimPrefix(key, "sk-"))
-	}
-	data = sanitize(data, secrets...)
-	if operation == "logs" || operation == "topups" || operation == "tasks" {
+	data = s.sanitizeData(ctx, a, c, data)
+	if operation == "logs" || operation == "tasks" {
 		var items []json.RawMessage
 		if json.Unmarshal(data, &items) != nil {
 			var p struct {
@@ -438,7 +503,11 @@ func (s *Service) Topup(ctx context.Context, a, provider string, payload json.Ra
 	if err != nil {
 		return nil, err
 	}
-	return s.manage.Topup(ctx, c, provider, payload)
+	data, err := s.manage.Topup(ctx, c, provider, payload)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
 }
 
 type Summary struct {

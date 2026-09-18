@@ -19,6 +19,16 @@ import (
 
 const MaxResponse = 32 << 20
 
+// HTTPError retains the upstream status for adapters while preserving the
+// existing Model API error contract through Unwrap.
+type HTTPError struct {
+	StatusCode int
+	Err        *httpx.Error
+}
+
+func (e *HTTPError) Error() string { return e.Err.Error() }
+func (e *HTTPError) Unwrap() error { return e.Err }
+
 type Client struct {
 	base string
 	http *http.Client
@@ -93,7 +103,7 @@ func (c *Client) Do(ctx context.Context, method, path, contentType string, body 
 				code = "UPSTREAM_RATE_LIMITED"
 				out = 429
 			}
-			return nil, httpx.E(out, code, "Kovar rejected the request")
+			return nil, &HTTPError{StatusCode: status, Err: httpx.E(out, code, "Kovar rejected the request")}
 		}
 		return resp, nil
 	}

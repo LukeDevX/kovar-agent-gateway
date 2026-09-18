@@ -14,6 +14,14 @@ func sanitize(raw json.RawMessage, secrets ...string) json.RawMessage {
 		return json.RawMessage(`null`)
 	}
 	redact(v, secrets)
+	if text, ok := v.(string); ok {
+		for _, secret := range secrets {
+			if secret != "" {
+				text = strings.ReplaceAll(text, secret, "[REDACTED]")
+			}
+		}
+		v = text
+	}
 	b, _ := json.Marshal(v)
 	return b
 }

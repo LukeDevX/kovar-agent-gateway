@@ -1,14 +1,16 @@
-// Package kovarmanage implements only management paths from kovar-manage-api.json.
+// Package kovarmanage implements only allowlisted paths from new-kovar-manage-api.json.
 package kovarmanage
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"kovar-gateway/internal/platform/httpx"
@@ -43,6 +45,7 @@ func (c Credential) headers() http.Header {
 
 type Envelope struct {
 	Success *bool           `json:"success"`
+	Message string          `json:"message"`
 	Data    json.RawMessage `json:"data"`
 }
 type User struct {
@@ -91,6 +94,13 @@ func (c *KovarManageClient) call(ctx context.Context, method, path string, cred 
 	defer clear(b)
 	resp, err := c.http.Do(ctx, method, path, "application/json", b, cred.headers())
 	if err != nil {
+		var status *upstream.HTTPError
+		if errors.As(err, &status) {
+			codes := map[int]string{400: "KOVAR_INVALID_REQUEST", 401: "KOVAR_AUTH_FAILED", 403: "KOVAR_FORBIDDEN", 404: "KOVAR_NOT_FOUND", 409: "KOVAR_CONFLICT", 429: "UPSTREAM_RATE_LIMITED"}
+			if code, ok := codes[status.StatusCode]; ok {
+				return Envelope{}, "", httpx.E(status.StatusCode, code, "Kovar rejected the request")
+			}
+		}
 		return Envelope{}, "", err
 	}
 	session := ""
@@ -104,11 +114,19 @@ func (c *KovarManageClient) call(ctx context.Context, method, path string, cred 
 		return Envelope{}, "", err
 	}
 	var e Envelope
-	if json.Unmarshal(raw, &e) != nil || e.Success == nil {
-		return e, "", httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "Kovar management response lacks ApiResponse.success")
+	if json.Unmarshal(raw, &e) != nil {
+		return Envelope{}, "", httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "invalid Kovar management response")
 	}
-	if !*e.Success {
-		return e, "", httpx.E(502, "KOVAR_REQUEST_REJECTED", "Kovar management request was rejected")
+	// Some payment controllers return message:error without a success field.
+	// Never return the upstream message: it can contain credentials/provider errors.
+	if (e.Success != nil && !*e.Success) || e.Message == "error" {
+		if strings.HasPrefix(path, "/api/user/topup/status?") && e.Message == "topup order not found" {
+			return Envelope{}, "", httpx.E(404, "KOVAR_NOT_FOUND", "topup order not found")
+		}
+		return Envelope{}, "", httpx.E(502, "KOVAR_REQUEST_REJECTED", "Kovar management request was rejected")
+	}
+	if e.Success == nil {
+		return e, "", httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "Kovar management response lacks ApiResponse.success")
 	}
 	return e, session, nil
 }
@@ -166,7 +184,7 @@ func (c *KovarManageClient) CreateToken(ctx context.Context, cred Credential, in
 	}
 	// ApiResponse.data is unspecified for token creation. Only the documented
 	// Token/PageInfo shapes are accepted; missing key retrieval stays explicit.
-	if t.ID == 0 || t.Key == "" {
+	if t.ID == 0 || t.Key == "" || strings.Contains(t.Key, "*") {
 		list, e := c.SearchTokens(ctx, cred, in.Name)
 		if e != nil {
 			return t, e
@@ -181,20 +199,27 @@ func (c *KovarManageClient) CreateToken(ctx context.Context, cred Credential, in
 			return t, httpx.E(502, "KOVAR_TOKEN_RECONCILIATION_REQUIRED", "created token could not be identified unambiguously")
 		}
 		t = matches[0]
-		if t.Key == "" {
-			t, err = c.Token(ctx, cred, t.ID)
-			if err != nil {
-				return t, err
-			}
-		}
 	}
-	if t.ID <= 0 || t.UserID != cred.UserID || t.Key == "" || t.Status == nil || t.ExpiredTime == nil || t.RemainQuota == nil {
+	if t.ID <= 0 || t.UserID != cred.UserID || t.Name != in.Name || t.Status == nil || t.ExpiredTime == nil || t.RemainQuota == nil {
 		return t, httpx.E(502, "KOVAR_TOKEN_RECONCILIATION_REQUIRED", "token response lacks documented Token fields or retrievable key")
 	}
+	// Search/get return masked keys in the new API. Fetch only the token just
+	// identified for this agent, never an arbitrary caller-supplied token ID.
+	e, _, err = c.call(ctx, "POST", fmt.Sprintf("/api/token/%d/key", t.ID), cred, nil)
+	if err != nil {
+		return Token{}, err
+	}
+	var secret struct {
+		Key string `json:"key"`
+	}
+	if json.Unmarshal(e.Data, &secret) != nil || strings.TrimSpace(secret.Key) == "" || strings.ContainsAny(secret.Key, "* \t\r\n") {
+		return Token{}, httpx.E(502, "KOVAR_TOKEN_RECONCILIATION_REQUIRED", "full token key is unavailable")
+	}
+	t.Key = secret.Key
 	return t, nil
 }
 func (c *KovarManageClient) SearchTokens(ctx context.Context, cred Credential, name string) ([]Token, error) {
-	e, _, err := c.call(ctx, "GET", "/api/token/search?keyword="+url.QueryEscape(name), cred, nil)
+	e, _, err := c.call(ctx, "GET", "/api/token/search?p=1&page_size=100&keyword="+url.QueryEscape(name), cred, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -204,9 +229,13 @@ func (c *KovarManageClient) SearchTokens(ctx context.Context, cred Credential, n
 	}
 	var page struct {
 		Items []Token `json:"items"`
+		Total *int64  `json:"total"`
 	}
 	if json.Unmarshal(e.Data, &page) != nil || page.Items == nil {
 		return nil, httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "token list does not match Token array or PageInfo.items")
+	}
+	if page.Total == nil || *page.Total != int64(len(page.Items)) {
+		return nil, httpx.E(502, "KOVAR_TOKEN_RECONCILIATION_REQUIRED", "token search is incomplete; creation will not be retried")
 	}
 	return page.Items, nil
 }
@@ -247,12 +276,12 @@ func (c *KovarManageClient) Read(ctx context.Context, cred Credential, operation
 	return e.Data, err
 }
 
-// Payment paths are present, but none of their request/response fields are
-// specified in the authoritative management document. Never guess a charge.
-func (c *KovarManageClient) Topup(_ context.Context, _ Credential, provider string, _ json.RawMessage) (json.RawMessage, error) {
+func (c *KovarManageClient) Topup(ctx context.Context, cred Credential, provider string, payload json.RawMessage) (json.RawMessage, error) {
 	switch provider {
+	case "axone":
+		return c.axoneOrder(ctx, cred, payload)
 	case "epay", "stripe", "creem":
-		return nil, httpx.NotSupported("management API documents the payment path but omits its request and response schema")
+		return nil, httpx.NotSupported("payment provider adapter is not enabled")
 	default:
 		return nil, httpx.NotSupported("payment provider is not documented")
 	}

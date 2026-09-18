@@ -40,6 +40,11 @@ func TestManageDocumentedOperations(t *testing.T) {
 			fmt.Fprint(w, `{"success":true,"data":{"id":9,"user_id":7,"name":"agent-fixture","key":"sk-fixture","status":1,"expired_time":2000000000,"remain_quota":100}}`)
 		case "/api/token/9":
 			fmt.Fprint(w, `{"success":true}`)
+		case "/api/token/9/key":
+			if r.Method != "POST" {
+				t.Error("full key retrieval must use POST")
+			}
+			fmt.Fprint(w, `{"success":true,"data":{"key":"sk-fixture"}}`)
 		case "/api/usage/token/":
 			if r.Header.Get("Authorization") != "Bearer sk-fixture" || r.URL.RawQuery != "" {
 				t.Error("token secret must be only in Authorization")

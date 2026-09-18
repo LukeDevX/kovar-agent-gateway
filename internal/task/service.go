@@ -33,11 +33,15 @@ func New(db *sql.DB, auth *identity.Service, b *binding.Service, m *kovarmodel.K
 	return &Service{db, auth, b, m, r}
 }
 func (s *Service) Models(ctx context.Context, a string) ([]kovarmodel.Model, error) {
-	key, _, err := s.binding.Key(ctx, a)
+	ids, err := s.binding.Models(ctx, a)
 	if err != nil {
 		return nil, err
 	}
-	return s.model.Models(ctx, key)
+	models := make([]kovarmodel.Model, 0, len(ids))
+	for _, id := range ids {
+		models = append(models, kovarmodel.Model{ID: id})
+	}
+	return models, nil
 }
 func (s *Service) Summary(ctx context.Context, a string) (Summary, error) {
 	return (repository{s.db}).summary(ctx, a)

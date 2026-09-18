@@ -12,7 +12,7 @@ Go + PostgreSQL 实现的 EVM Agent 身份网关。将钱包签名认证、Gatew
 - Gateway 不托管 EVM 钱包。Agent Wallet 可以使用自己的链上资金，通过本地签名转 ETH、ERC20、Approve 或调用合约。
 - Kovar API Key 用于模型调用，不是 Agent 身份凭证。
 - Gateway 当前不实现资金冻结，不伪造 settlement，不修改 Kovar 用户余额。
-- 钱包资金与 Kovar quota 是独立资产体系；这两份 API 文档没有提供 EVM 自动充值协议，本项目不实现 Wallet → Kovar 自动充值。
+- 钱包资金与 Kovar quota 是独立资产体系。Gateway 可创建 Axone 充值订单并查询 Kovar 订单状态；不自动转出钱包资金，也不自行增加账户 quota。
 
 ## 架构与目录
 
@@ -78,7 +78,7 @@ curl -fsS http://127.0.0.1:8080/ready
 
 ### 使用远程 PostgreSQL
 
-应用和 migration 都从 `DATABASE_URL` 读取连接串。将 `.env` 中唯一的该变量设置为远程 PostgreSQL URL；不要将凭据提交到仓库或贴入日志。URL 未带数据库名时 PostgreSQL 默认连接到与用户名同名的数据库（本例通常为 `postgres`）。
+应用和 migration 都从 `DATABASE_URL` 读取连接串。将 `.env` 中唯一的该变量设置为远程 PostgreSQL URL；不要将凭据提交到仓库或贴入日志。远程 URL 必须显式包含数据库名，例如以 `/railway` 结尾；省略时 PostgreSQL 默认连接到与用户名同名的数据库（本例为 `postgres`），而不是 Railway 创建的 `railway` 数据库。
 
 远程数据库不需要执行 `docker compose up`；`POSTGRES_PASSWORD` 和 `POSTGRES_PORT` 仅供本地 Docker 服务使用。执行 migration 前确认该远程实例属于本项目并允许创建业务表；`make migrate-down` 会删除本项目的表和数据，不能对远程生产库随意运行。
 
@@ -185,19 +185,21 @@ message := "Kovar Agent Gateway\nAction: Request\n" +
 
 默认额度取该 Agent 月预算，默认有效期 30 天。Gateway 创建 `agent-{lowercase_address}`；本地先占据唯一创建槽位，再调用上游，不盲目重试。数据库 `agent_address UNIQUE`、`kovar_token_id UNIQUE`、规范化 Key 指纹 `UNIQUE` 防止一个 Agent 多 Key 和多个 Agent 共用 Key。AES-GCM 的 AAD 绑定 Agent 地址与用途，不能把其他 Agent 的密文移植过来。
 
-创建响应若未包含 Token，则通过文档中存在的 `/api/token/search?keyword=agent-...` 和 `/api/token/{id}` 获取。必须能唯一识别并得到完整 Key；没有结果或多个结果时进入显式 reconciliation 状态，绝不重新创建另一个收费凭证。
+创建响应若未包含 Token，则通过 `/api/token/search?keyword=agent-...&p=1&page_size=100` 精确识别。新版搜索和详情的 Key 已脱敏；校验用户归属及 Agent token name 后，通过 `POST /api/token/{id}/key` 获取完整 Key。没有结果、多个结果、搜索结果不完整或 Key 获取失败时进入显式 reconciliation 状态，绝不重新创建另一个收费凭证。
 
 ## Kovar Manage API
 
-事实来源为 [`kovar-manage-api.json`](kovar-manage-api.json)。Client 覆盖注册、登录、2FA、self、Token create/search/get/delete、`/api/usage/token/`、pricing、ratio config、data self、用户模型管理信息、topup info/history、个人 logs/stat、个人 Kovar task 查询。
+当前事实来源为 [`new-kovar-manage-api.json`](new-kovar-manage-api.json)，旧版 `kovar-manage-api.json` 保留用于比较。Client 覆盖注册、登录、2FA、self、Token create/search/get/key/delete、`/api/usage/token/`、pricing、ratio config、data self、用户模型、topup info/history/status、Axone chains/order、个人 logs/stat、个人 Kovar task 查询。完整差异和补充源码依据见 [迁移矩阵](docs/manage-api-migration.md)。
 
 管理认证为 Session Cookie 或管理 Access Token，并携带 `New-Api-User`。模型 Token usage 使用 `Authorization`，不使用 `/api/log/token?key=`。
 
-充值 provider epay、stripe、creem 的路径在文档存在，但请求字段和响应结构均缺失。当前 `POST /api/v1/account/topup` 明确返回 `NOT_SUPPORTED`，并保存幂等结果；没有向不明协议的支付接口发送请求。充值信息和历史查询可用。
+充值先查询 info，再由用户明确选择 provider。`POST /api/v1/account/topup` 沿用 `provider/payload` 和 `Idempotency-Key`，新增 `provider:"axone"`；payload 为 `amount`（正整数）、`currency`、`chain_id`、`payment_wallet_address`。可通过 `GET /api/v1/account/topup/axone/chains` 查询链信息。创建返回 `pending` 订单与支付地址，不代表支付成功；使用 `GET /api/v1/account/topup/status?trade_no=...` 查询绑定用户的订单。上游状态原样保留（当前源码为 pending/success/failed/expired），quota 仍从 account 查询，不在 Gateway 入账。epay、stripe、creem 尚未接入，继续返回 `NOT_SUPPORTED`。历史支持 `page/page_size/keyword`，映射上游分页并保留真实 total。
+
+pricing 始终携带绑定用户认证，以兼容 HeaderNavModules/requireAuth。管理上游 400/401/403/404/409/429 映射为对应 Gateway 状态和固定错误码；5xx 映射 502，超时 504。HTTP 200 的 `success:false` 或 `message:"error"` 仍视为失败；上游 message 和认证信息不直接返回。
 
 ## Kovar Model API 与 Task
 
-事实来源为 [`kovar-new-api.json`](kovar-new-api.json)。可用模型实时来自 Agent 专属 Key 的 `GET /v1/models`，不使用管理模型列表替代授权判断。
+事实来源为 [`kovar-new-api.json`](kovar-new-api.json)。Gateway `GET /api/v1/models` 使用绑定用户的 `/api/user/models`，保持 `{data:[{id}]}` 响应。任务执行仍使用 Agent 专属 Key 的 `GET /v1/models` 检查 Key 可用模型，再调用 Model API；不使用 Dashboard 或管理员模型列表。
 
 创建任务：
 
@@ -319,10 +321,10 @@ make test-integration  # 使用 .env 的数据库，含 go test -race ./...
 
 ## Known Limitations / 文档缺口
 
-1. Manage 所有相关 operation 的响应没有 content schema，仅有可复用的 ApiResponse/User/Token/PageInfo；实现严格检查可确认字段。实际部署不符合时返回 `KOVAR_CONTRACT_INCOMPLETE`，没有把 mock 当生产验证。
+1. 新版 Manage 多数响应仍只有 ApiResponse，data 未详细定义；用户模型、分页、充值状态和 Axone 的最小字段依据同级上游源码确认，其他字段保留可脱敏的 raw JSON。实际部署不符合时返回 `KOVAR_CONTRACT_INCOMPLETE`，没有把 mock 当生产验证。
 2. pricing／ratio config／Token usage／data self／日志统计字段缺失。默认路由为空且收费请求 fail closed；price pointer 和 quota 换算须由部署方确认。实际费用无法确认时永远 NULL。
-3. epay、stripe、creem 请求／响应字段缺失，创建充值返回 NOT_SUPPORTED；无 EVM 自动充值、reserve、freeze、settle 接口。
-4. Token 创建响应或列表若不返回完整 Key，文档中也没有额外 key-reveal endpoint；进入 reconciliation 状态，不编造接口。网络超时、进程崩溃或上游成功而本地写入失败，可能留下 CREATING/UNKNOWN 或 RUNNING；需用已记录 Agent/Token name/provider_task_id 在 Kovar 核实后处理。禁止通过清除幂等记录盲目重发收费请求。
+3. epay、stripe、creem 新版已有请求 schema，但其 provider adapter 本次未接入，继续返回 NOT_SUPPORTED；Axone wallets/PayGo、address 别名和支付回调暂不公开。Gateway 不执行钱包转账或自行结算。
+4. 完整模型 Key 通过新版 key endpoint 获取，失败进入 reconciliation 状态。网络超时、进程崩溃或上游成功而本地写入失败，可能留下 CREATING/UNKNOWN 或 RUNNING；需用已记录 Agent/Token name/provider_task_id 在 Kovar 核实后处理。充值结果不确定时也必须核实订单，禁止通过清除幂等记录盲目重发收费请求。
 5. 预算是预检查。多个 Agent 共用同一 Kovar 用户、外部使用账户、实际费用超估算及上游未知扣费会影响真实余额；Kovar 执行最终计费。Gateway 不保证上游原子余额预留。
 6. Suspend/Revoke 阻止新准入；已提交给上游的请求不能通过未记载的取消接口撤销。视频以 GET Task 按需轮询，无后台自动重试收费请求。
 7. 本版不实现外部支付回调、Kovar 管理员接口、Kling/Jimeng/Sora 专用协议、Responses、Passkey 或非 EVM 身份；这些不属于第一版所需最小调用能力。

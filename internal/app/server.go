@@ -226,9 +226,18 @@ func (s *Server) Handler() http.Handler {
 			if err != nil {
 				return nil, err
 			}
+			if op == "topups" {
+				return s.Service.Binding.Topups(r.Context(), i.Agent, p, n, r.URL.Query().Get("keyword"))
+			}
 			return s.Service.Binding.Read(r.Context(), i.Agent, op, p, n)
 		})
 	}
+	route("GET /api/v1/account/topup/status", "agent", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
+		return s.Service.Binding.TopupStatus(r.Context(), i.Agent, r.URL.Query().Get("trade_no"))
+	})
+	route("GET /api/v1/account/topup/axone/chains", "agent", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
+		return s.Service.Binding.AxoneChains(r.Context(), i.Agent)
+	})
 	route("POST /api/v1/account/topup", "agent", s.idempotent("topup", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
 		var in struct {
 			Provider string          `json:"provider"`

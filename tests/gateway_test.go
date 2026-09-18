@@ -39,6 +39,10 @@ type mockKovar struct {
 	next             int64
 	models           atomic.Int32
 	creates          atomic.Int32
+	topups           atomic.Int32
+	topupFailure     atomic.Int32
+	userModels       atomic.Int32
+	keyModels        atomic.Int32
 	deletes          atomic.Int32
 	failure          atomic.Int32
 	delay            atomic.Int64
@@ -89,7 +93,18 @@ func (m *mockKovar) serve(w http.ResponseWriter, r *http.Request) {
 		token := kovarmanage.Token{ID: id, UserID: 7, Name: in.Name, Key: fmt.Sprintf("sk-fixture-%d", id), Status: &status, ExpiredTime: &in.ExpiredTime, RemainQuota: &in.RemainQuota}
 		m.tokens[id] = token
 		m.mu.Unlock()
-		send(token)
+		send(nil)
+	case r.URL.Path == "/api/token/search":
+		m.mu.Lock()
+		items := []kovarmanage.Token{}
+		for _, token := range m.tokens {
+			if token.Name == r.URL.Query().Get("keyword") {
+				token.Key = "sk-****masked"
+				items = append(items, token)
+			}
+		}
+		m.mu.Unlock()
+		send(map[string]any{"items": items, "total": len(items)})
 	case strings.HasPrefix(r.URL.Path, "/api/token/"):
 		var id int64
 		_, _ = fmt.Sscan(strings.TrimPrefix(r.URL.Path, "/api/token/"), &id)
@@ -112,6 +127,11 @@ func (m *mockKovar) serve(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(404)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/key") && r.Method == "POST" {
+			send(map[string]string{"key": token.Key})
+			return
+		}
+		token.Key = "sk-****masked"
 		send(token)
 	case r.URL.Path == "/api/usage/token/":
 		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer sk-fixture-") {
@@ -121,11 +141,32 @@ func (m *mockKovar) serve(w http.ResponseWriter, r *http.Request) {
 		send(map[string]any{"fixture_usage": 0})
 	case r.URL.Path == "/api/pricing":
 		send(map[string]any{"fixture-chat": "2", "fixture-image": "3", "fixture-video": "4", "fixture-speech": "1", "fixture-transcription": "1", "fixture-embedding": "1", "fixture-rerank": "1"})
-	case r.URL.Path == "/api/log/self" || r.URL.Path == "/api/user/topup/self":
+	case r.URL.Path == "/api/log/self":
 		send([]any{})
+	case r.URL.Path == "/api/user/topup/self":
+		send(map[string]any{"items": []any{map[string]string{"trade_no": "page-" + r.URL.Query().Get("p"), "keyword": r.URL.Query().Get("keyword")}}, "total": 41})
+	case r.URL.Path == "/api/user/models":
+		m.userModels.Add(1)
+		send([]string{"fixture-chat", "user-only-model"})
+	case r.URL.Path == "/api/user/topup/status":
+		if r.URL.Query().Get("trade_no") != "AXONE-7-test" || r.Header.Get("New-Api-User") != "7" {
+			fmt.Fprint(w, `{"success":false,"message":"topup order not found"}`)
+			return
+		}
+		send(map[string]any{"trade_no": "AXONE-7-test", "status": "pending", "amount": 10, "money": json.Number("10.01"), "session": "fixture-user-7"})
+	case r.URL.Path == "/api/user/axone/chains":
+		send([]any{map[string]string{"chain_id": "fixture-chain"}})
+	case r.URL.Path == "/api/user/axone/order":
+		m.topups.Add(1)
+		if status := m.topupFailure.Load(); status != 0 {
+			w.WriteHeader(int(status))
+			return
+		}
+		send(map[string]any{"trade_no": "AXONE-7-test", "address": "fixture-payment-address", "status": "pending", "payment_money": "10.01", "access_token": "do-not-return"})
 	case r.URL.Path == "/api/log/self/stat" || r.URL.Path == "/api/user/topup/info":
 		send(map[string]any{})
 	case r.URL.Path == "/v1/models":
+		m.keyModels.Add(1)
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{map[string]string{"id": "fixture-chat"}, map[string]string{"id": "fixture-image"}, map[string]string{"id": "fixture-video"}, map[string]string{"id": "fixture-speech"}, map[string]string{"id": "fixture-transcription"}, map[string]string{"id": "fixture-embedding"}, map[string]string{"id": "fixture-rerank"}}})
 	case r.URL.Path == "/v1/video/generations/provider1":
 		fmt.Fprint(w, `{"task_id":"provider1","status":"completed","url":"https://example.com/video.mp4"}`)
