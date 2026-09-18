@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "required": [
+    "model",
+    "input",
+    "voice"
+  ],
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "input": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "voice": {
+      "type": "string",
+      "enum": [
+        "alloy",
+        "echo",
+        "fable",
+        "onyx",
+        "nova",
+        "shimmer"
+      ]
+    },
+    "response_format": {
+      "type": "string",
+      "enum": [
+        "mp3",
+        "opus",
+        "aac",
+        "flac",
+        "wav",
+        "pcm"
+      ],
+      "default": "mp3"
+    },
+    "speed": {
+      "type": "number",
+      "minimum": 0.25,
+      "maximum": 4,
+      "default": 1
+    }
+  },
+  "additionalProperties": false
+}

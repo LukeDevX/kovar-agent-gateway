@@ -1,0 +1,44 @@
+{
+  "type": "object",
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "prompt": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string"
+    },
+    "duration": {
+      "type": "number"
+    },
+    "width": {
+      "type": "integer"
+    },
+    "height": {
+      "type": "integer"
+    },
+    "fps": {
+      "type": "integer"
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "n": {
+      "type": "integer"
+    },
+    "response_format": {
+      "type": "string"
+    },
+    "user": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {}
+    }
+  },
+  "additionalProperties": false
+}

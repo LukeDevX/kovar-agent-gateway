@@ -1,0 +1,373 @@
+{
+  "type": "object",
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "stream": {
+      "type": "boolean",
+      "default": false
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant",
+              "tool",
+              "developer"
+            ]
+          },
+          "content": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "image_url",
+                        "input_audio",
+                        "file",
+                        "video_url"
+                      ]
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "image_url": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "high",
+                            "auto"
+                          ]
+                        }
+                      }
+                    },
+                    "input_audio": {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "type": "string",
+                          "enum": [
+                            "wav",
+                            "mp3"
+                          ]
+                        }
+                      }
+                    },
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string"
+                        },
+                        "file_data": {
+                          "type": "string"
+                        },
+                        "file_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "video_url": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "function": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "arguments": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "tool_call_id": {
+            "type": "string"
+          },
+          "reasoning_content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ]
+      }
+    },
+    "extra_body": {
+      "type": "object",
+      "properties": {
+        "google": {
+          "type": "object",
+          "properties": {
+            "image_config": {
+              "type": "object",
+              "properties": {
+                "aspect_ratio": {
+                  "type": "string"
+                },
+                "image_size": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "aspect_ratio",
+                "image_size"
+              ]
+            }
+          },
+          "required": [
+            "image_config"
+          ]
+        }
+      },
+      "required": [
+        "google"
+      ]
+    },
+    "contents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "temperature": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "default": 1
+    },
+    "top_p": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 1
+    },
+    "n": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "stream_options": {
+      "type": "object",
+      "properties": {
+        "include_usage": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stop": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "max_tokens": {
+      "type": "integer"
+    },
+    "max_completion_tokens": {
+      "type": "integer"
+    },
+    "presence_penalty": {
+      "type": "number",
+      "minimum": -2,
+      "maximum": 2,
+      "default": 0
+    },
+    "frequency_penalty": {
+      "type": "number",
+      "minimum": -2,
+      "maximum": 2,
+      "default": 0
+    },
+    "logit_bias": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      },
+      "properties": {}
+    },
+    "user": {
+      "type": "string"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "function": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "tool_choice": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "none",
+            "auto",
+            "required"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "function": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "response_format": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "text",
+            "json_object",
+            "json_schema"
+          ]
+        },
+        "json_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "reasoning_effort": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "modalities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "text",
+          "audio"
+        ]
+      }
+    },
+    "audio": {
+      "type": "object",
+      "properties": {
+        "voice": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "required": [
+    "model",
+    "messages"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "string",
+      "format": "binary"
+    },
+    "model": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "prompt": {
+      "type": "string"
+    },
+    "response_format": {
+      "type": "string",
+      "enum": [
+        "json",
+        "text",
+        "srt",
+        "verbose_json",
+        "vtt"
+      ],
+      "default": "json"
+    },
+    "temperature": {
+      "type": "number"
+    },
+    "timestamp_granularities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "word",
+          "segment"
+        ]
+      }
+    }
+  },
+  "required": [
+    "file",
+    "model"
+  ],
+  "additionalProperties": false
+}

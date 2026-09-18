@@ -1,0 +1,66 @@
+{
+  "type": "object",
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string"
+              },
+              "content": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "image": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "messages"
+      ]
+    },
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "n": {
+          "type": "integer"
+        },
+        "negative_prompt": {
+          "type": "string"
+        },
+        "prompt_extend": {
+          "type": "boolean"
+        },
+        "watermark": {
+          "type": "boolean"
+        },
+        "size": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "required": [
+    "model",
+    "input"
+  ],
+  "additionalProperties": false
+}

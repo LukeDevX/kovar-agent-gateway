@@ -1,0 +1,36 @@
+{
+  "type": "object",
+  "properties": {
+    "image": {
+      "type": "string",
+      "format": "binary"
+    },
+    "mask": {
+      "type": "string",
+      "format": "binary"
+    },
+    "prompt": {
+      "type": "string"
+    },
+    "n": {
+      "type": "string"
+    },
+    "size": {
+      "type": "string"
+    },
+    "response_format": {
+      "type": "string"
+    },
+    "user": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "image",
+    "prompt"
+  ],
+  "additionalProperties": false
+}

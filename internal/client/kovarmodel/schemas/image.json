@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "prompt": {
+      "type": "string"
+    },
+    "n": {
+      "type": "integer"
+    },
+    "size": {
+      "type": "string"
+    },
+    "background": {
+      "type": "string"
+    },
+    "moderation": {
+      "type": "string"
+    },
+    "quality": {
+      "type": "string"
+    },
+    "stream": {
+      "type": "string"
+    },
+    "style": {
+      "type": "string"
+    },
+    "user": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "prompt"
+  ],
+  "additionalProperties": false
+}

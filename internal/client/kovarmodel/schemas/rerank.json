@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "required": [
+    "model",
+    "query",
+    "documents"
+  ],
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "query": {
+      "type": "string"
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {}
+          }
+        ]
+      }
+    },
+    "top_n": {
+      "type": "integer"
+    },
+    "return_documents": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "additionalProperties": false
+}

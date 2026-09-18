@@ -1,0 +1,1 @@
+DROP TABLE rate_limit_windows, audit_logs, idempotency_records, agent_usage_records, gateway_tasks, agent_budget_policies, agent_kovar_tokens, pending_kovar_logins, agent_user_bindings, agent_whitelist, agent_challenges, agents, admin_sessions, gateway_admins;
