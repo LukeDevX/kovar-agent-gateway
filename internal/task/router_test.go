@@ -59,3 +59,17 @@ func TestOutputLimitAppliesToFixedRequestPricing(t *testing.T) {
 		}
 	}
 }
+
+func TestPricingLooksUpModelByName(t *testing.T) {
+	// Real /api/pricing returns an array of model entries whose order can vary.
+	// The rule must resolve by model_name, not by array index.
+	pricing := json.RawMessage(`[
+		{"model_name":"gpt-5.5","model_ratio":1.5,"completion_ratio":1},
+		{"model_name":"deepseek-v4-pro","model_ratio":0.783,"completion_ratio":2}
+	]`)
+	r := Rule{TaskType: "chat", Model: "deepseek-v4-pro", PricingPointer: "/deepseek-v4-pro/model_ratio", QuotaMultiplier: "2", Unit: "request", MaxInputBytes: 1000, MaxOutputTokens: 128}
+	n, err := (PricingService{}).Quote(pricing, r, map[string]any{}, 1)
+	if err != nil || n != 2 {
+		t.Fatalf("Quote = %d, %v; want 2", n, err)
+	}
+}

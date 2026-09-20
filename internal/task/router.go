@@ -80,10 +80,47 @@ type PricingService struct{}
 // Integers are Kovar quota units; rational arithmetic rounds estimates upward.
 var decimal = regexp.MustCompile(`^-?[0-9]{1,32}(\.[0-9]{1,24})?([eE][+-]?[0-9]{1,2})?$`)
 
+// normalizePricing rewrites the real Kovar /api/pricing data (an array of
+// model entries like {"model_name":"deepseek-v4-pro","model_ratio":...}) into
+// a model-name-keyed map, so routing rules can use a stable pointer such as
+// /deepseek-v4-pro/model_ratio instead of a volatile array index. Map-shaped
+// pricing (test fixtures) is returned unchanged.
+func normalizePricing(pricing json.RawMessage) json.RawMessage {
+	var entries []map[string]json.RawMessage
+	if json.Unmarshal(pricing, &entries) != nil {
+		return pricing
+	}
+	byName := make(map[string]json.RawMessage, len(entries))
+	for _, e := range entries {
+		raw, ok := e["model_name"]
+		if !ok {
+			continue
+		}
+		var name string
+		if json.Unmarshal(raw, &name) != nil || name == "" {
+			continue
+		}
+		b, err := json.Marshal(e)
+		if err != nil {
+			continue
+		}
+		byName[name] = b
+	}
+	if len(byName) == 0 {
+		return pricing
+	}
+	out, err := json.Marshal(byName)
+	if err != nil {
+		return pricing
+	}
+	return out
+}
+
 func (PricingService) Quote(pricing json.RawMessage, r Rule, payload map[string]any, size int64) (int64, error) {
 	if size > r.MaxInputBytes {
 		return 0, httpx.Invalid("request exceeds configured model input limit")
 	}
+	pricing = normalizePricing(pricing)
 	var doc any
 	d := json.NewDecoder(bytes.NewReader(pricing))
 	d.UseNumber()

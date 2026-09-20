@@ -49,7 +49,7 @@ func TestManageDocumentedOperations(t *testing.T) {
 			if r.Header.Get("Authorization") != "Bearer sk-fixture" || r.URL.RawQuery != "" {
 				t.Error("token secret must be only in Authorization")
 			}
-			fmt.Fprint(w, `{"success":true,"data":{}}`)
+			fmt.Fprint(w, `{"code":true,"message":"ok","data":{}}`)
 		case "/api/pricing", "/api/ratio_config", "/api/user/topup/info", "/api/user/topup/self", "/api/log/self", "/api/log/self/stat", "/api/data/self", "/api/task/self", "/api/user/models":
 			fmt.Fprint(w, `{"success":true,"data":[]}`)
 		default:

@@ -82,13 +82,16 @@ type CreateTokenRequest struct {
 	Unlimited   bool   `json:"unlimited_quota"`
 }
 
-func (c *KovarManageClient) call(ctx context.Context, method, path string, cred Credential, in any) (Envelope, string, error) {
+// request performs the HTTP round-trip and returns the decoded JSON body plus
+// any session cookie. Envelope validation is left to callers because a few
+// endpoints (token usage) use a different success field.
+func (c *KovarManageClient) request(ctx context.Context, method, path string, cred Credential, in any) (json.RawMessage, string, error) {
 	var b []byte
 	var err error
 	if in != nil {
 		b, err = json.Marshal(in)
 		if err != nil {
-			return Envelope{}, "", err
+			return nil, "", err
 		}
 	}
 	defer clear(b)
@@ -98,10 +101,10 @@ func (c *KovarManageClient) call(ctx context.Context, method, path string, cred 
 		if errors.As(err, &status) {
 			codes := map[int]string{400: "KOVAR_INVALID_REQUEST", 401: "KOVAR_AUTH_FAILED", 403: "KOVAR_FORBIDDEN", 404: "KOVAR_NOT_FOUND", 409: "KOVAR_CONFLICT", 429: "UPSTREAM_RATE_LIMITED"}
 			if code, ok := codes[status.StatusCode]; ok {
-				return Envelope{}, "", httpx.E(status.StatusCode, code, "Kovar rejected the request")
+				return nil, "", httpx.E(status.StatusCode, code, "Kovar rejected the request")
 			}
 		}
-		return Envelope{}, "", err
+		return nil, "", err
 	}
 	session := ""
 	for _, cookie := range resp.Cookies() {
@@ -110,6 +113,14 @@ func (c *KovarManageClient) call(ctx context.Context, method, path string, cred 
 		}
 	}
 	raw, err := upstream.JSON(resp)
+	if err != nil {
+		return nil, "", err
+	}
+	return raw, session, nil
+}
+
+func (c *KovarManageClient) call(ctx context.Context, method, path string, cred Credential, in any) (Envelope, string, error) {
+	raw, session, err := c.request(ctx, method, path, cred, in)
 	if err != nil {
 		return Envelope{}, "", err
 	}
@@ -255,8 +266,32 @@ func (c *KovarManageClient) DeleteToken(ctx context.Context, cred Credential, id
 	return err
 }
 func (c *KovarManageClient) Usage(ctx context.Context, key string) (json.RawMessage, error) {
-	e, _, err := c.call(ctx, "GET", "/api/usage/token/", Credential{AccessToken: key}, nil)
-	return e.Data, err
+	raw, _, err := c.request(ctx, "GET", "/api/usage/token/", Credential{AccessToken: key}, nil)
+	if err != nil {
+		return nil, err
+	}
+	// GetTokenUsage is inconsistent with the rest of the management API: its
+	// success response uses "code" instead of "success", while its error path
+	// (ApiErrorI18n) still returns "success":false. Accept both here.
+	var e struct {
+		Success *bool           `json:"success"`
+		Code    *bool           `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if json.Unmarshal(raw, &e) != nil {
+		return nil, httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "invalid Kovar usage response")
+	}
+	if e.Success != nil && !*e.Success {
+		return nil, httpx.E(502, "KOVAR_REQUEST_REJECTED", "Kovar usage request was rejected")
+	}
+	if e.Code == nil {
+		return nil, httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "Kovar usage response lacks code")
+	}
+	if !*e.Code {
+		return nil, httpx.E(502, "KOVAR_REQUEST_REJECTED", "Kovar usage request was rejected")
+	}
+	return e.Data, nil
 }
 func (c *KovarManageClient) Pricing(ctx context.Context, cred Credential) (json.RawMessage, error) {
 	e, _, err := c.call(ctx, "GET", "/api/pricing", cred, nil)

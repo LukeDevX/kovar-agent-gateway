@@ -39,6 +39,7 @@ type mockKovar struct {
 	next             int64
 	models           atomic.Int32
 	creates          atomic.Int32
+	lastExpiry       atomic.Int64
 	topups           atomic.Int32
 	topupFailure     atomic.Int32
 	userModels       atomic.Int32
@@ -86,6 +87,7 @@ func (m *mockKovar) serve(w http.ResponseWriter, r *http.Request) {
 		m.creates.Add(1)
 		var in kovarmanage.CreateTokenRequest
 		_ = json.NewDecoder(r.Body).Decode(&in)
+		m.lastExpiry.Store(in.ExpiredTime)
 		m.mu.Lock()
 		m.next++
 		id := m.next
@@ -138,7 +140,7 @@ func (m *mockKovar) serve(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(401)
 			return
 		}
-		send(map[string]any{"fixture_usage": 0})
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": true, "message": "ok", "data": map[string]any{"fixture_usage": 0}})
 	case r.URL.Path == "/api/pricing":
 		send(map[string]any{"fixture-chat": "2", "fixture-image": "3", "fixture-video": "4", "fixture-speech": "1", "fixture-transcription": "1", "fixture-embedding": "1", "fixture-rerank": "1"})
 	case r.URL.Path == "/api/log/self":
@@ -236,6 +238,10 @@ type fixture struct {
 }
 
 func setup(t *testing.T) *fixture {
+	return setupWithRequestTimeout(t, 2*time.Second)
+}
+
+func setupWithRequestTimeout(t *testing.T, requestTimeout time.Duration) *fixture {
 	t.Helper()
 	db := testutil.Database(t)
 	m := newMock(t)
@@ -248,7 +254,7 @@ func setup(t *testing.T) *fixture {
 	if err := os.WriteFile(path, b, 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Config{Env: "test", ManageURL: m.server.URL, ModelURL: m.server.URL, AdminUsername: "admin", AdminPassword: "fixture-admin-password", EncryptionKey: base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{9}, 32)), RouterConfig: path, HTTPTimeout: 500 * time.Millisecond, RequestTimeout: 2 * time.Second, ClockSkew: 5 * time.Minute, NonceTTL: 5 * time.Minute, AdminTTL: time.Hour, PerRequest: 10, Daily: 100, Monthly: 1000, MaxBody: 8 << 20, IPRate: 100000, AgentRate: 100000, LoginRate: 100000}
+	cfg := config.Config{Env: "test", ManageURL: m.server.URL, ModelURL: m.server.URL, AdminUsername: "admin", AdminPassword: "fixture-admin-password", EncryptionKey: base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{9}, 32)), RouterConfig: path, HTTPTimeout: 500 * time.Millisecond, RequestTimeout: requestTimeout, ClockSkew: 5 * time.Minute, NonceTTL: 5 * time.Minute, AdminTTL: time.Hour, PerRequest: 10, Daily: 100, Monthly: 1000, MaxBody: 8 << 20, IPRate: 100000, AgentRate: 100000, LoginRate: 100000}
 	g, err := app.New(db, cfg, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
@@ -437,6 +443,26 @@ func TestConcurrentTaskAndKeyIdempotency(t *testing.T) {
 	expectCode(t, f.request(t, "POST", "/api/v1/agent/token", `{}`, "another-key", true), 409, "KOVAR_TOKEN_ALREADY_BOUND")
 	if f.mock.creates.Load() != 1 {
 		t.Fatal("duplicate upstream token created")
+	}
+}
+
+func TestDefaultTokenNeverExpires(t *testing.T) {
+	// This test runs the complete admin/register/login/token flow. Keep its
+	// request timeout tolerant of bcrypt under race-enabled CI builders.
+	f := setupWithRequestTimeout(t, 20*time.Second)
+	var v map[string]any
+	decode(t, f.request(t, "POST", "/api/v1/admin/agents/"+f.address+"/approve", `{}`, "", false), &v)
+	decode(t, f.request(t, "POST", "/api/v1/kovar/auth/login", `{"username":"fixture","password":"request-only-password"}`, "login-permanent", true), &v)
+	decode(t, f.request(t, "POST", "/api/v1/agent/token", `{}`, "token-permanent", true), &v)
+	if got := f.mock.lastExpiry.Load(); got != -1 {
+		t.Fatalf("default expired_time = %d, want -1", got)
+	}
+	var expiredAt *time.Time
+	if err := f.db.QueryRow(`SELECT expired_at FROM agent_kovar_tokens WHERE agent_address=$1`, f.address).Scan(&expiredAt); err != nil {
+		t.Fatal(err)
+	}
+	if expiredAt != nil {
+		t.Fatalf("permanent token expired_at = %v, want NULL", expiredAt)
 	}
 }
 func TestModelTasksAndFailures(t *testing.T) {

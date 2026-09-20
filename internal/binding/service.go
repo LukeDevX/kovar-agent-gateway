@@ -199,9 +199,9 @@ func (s *Service) CreateKey(ctx context.Context, a string, opt KeyOptions) (Toke
 		return TokenInfo{}, httpx.Invalid("token quota must be positive and within monthly policy")
 	}
 	if opt.ExpiredTime == 0 {
-		opt.ExpiredTime = time.Now().Add(30 * 24 * time.Hour).Unix()
+		opt.ExpiredTime = -1
 	}
-	if opt.ExpiredTime <= time.Now().Unix() {
+	if opt.ExpiredTime != -1 && opt.ExpiredTime <= time.Now().Unix() {
 		return TokenInfo{}, httpx.Invalid("token expiry must be in the future")
 	}
 	admission, err := tx.ExecContext(ctx, `INSERT INTO agent_kovar_tokens(agent_address,kovar_user_id,status) VALUES($1,$2,'CREATING') ON CONFLICT(agent_address) DO UPDATE SET status='CREATING',kovar_token_id=NULL,encrypted_kovar_key=NULL,key_fingerprint=NULL,updated_at=now() WHERE agent_kovar_tokens.status='DELETED'`, a, c.UserID)
