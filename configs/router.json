@@ -2,12 +2,336 @@
   "rules": [
     {
       "task_type": "chat",
+      "model": "MiniMax-M2.7",
+      "pricing_pointer": "/MiniMax-M2.7/model_ratio",
+      "quota_multiplier": "1",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
+      "model": "MiniMax-M3",
+      "pricing_pointer": "/MiniMax-M3/model_ratio",
+      "quota_multiplier": "1",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
+      "model": "Qwen/Qwen3-Max",
+      "pricing_pointer": "/Qwen~1Qwen3-Max/model_ratio",
+      "quota_multiplier": "4",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-fable-5",
+      "pricing_pointer": "/claude-fable-5/model_ratio",
+      "quota_multiplier": "1",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 1555
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-haiku-4-5-20251001",
+      "pricing_pointer": "/claude-haiku-4-5-20251001/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 3111
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-opus-4-5-20251101",
+      "pricing_pointer": "/claude-opus-4-5-20251101/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 622
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-opus-4-5-20251101-thinking",
+      "pricing_pointer": "/claude-opus-4-5-20251101-thinking/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 622
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-opus-4-6",
+      "pricing_pointer": "/claude-opus-4-6/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 622
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-opus-4-7",
+      "pricing_pointer": "/claude-opus-4-7/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 622
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-opus-4-8",
+      "pricing_pointer": "/claude-opus-4-8/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 622
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-sonnet-4-6",
+      "pricing_pointer": "/claude-sonnet-4-6/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 1037
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-sonnet-4.5",
+      "pricing_pointer": "/claude-sonnet-4.5/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 1037
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-sonnet-4.5-thinking",
+      "pricing_pointer": "/claude-sonnet-4.5-thinking/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 1037
+    },
+    {
+      "task_type": "chat",
+      "model": "claude-sonnet-5",
+      "pricing_pointer": "/claude-sonnet-5/model_ratio",
+      "quota_multiplier": "1",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 7000
+    },
+    {
+      "task_type": "chat",
+      "model": "deepseek-ai/DeepSeek-R1",
+      "pricing_pointer": "/deepseek-ai~1DeepSeek-R1/model_ratio",
+      "quota_multiplier": "1.5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
+      "model": "deepseek-ai/DeepSeek-V3-0324",
+      "pricing_pointer": "/deepseek-ai~1DeepSeek-V3-0324/model_ratio",
+      "quota_multiplier": "1.5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
+      "model": "deepseek-ai/DeepSeek-V3.2",
+      "pricing_pointer": "/deepseek-ai~1DeepSeek-V3.2/model_ratio",
+      "quota_multiplier": "1.518518518519",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
+      "model": "deepseek-v4-flash",
+      "pricing_pointer": "/deepseek-v4-flash/model_ratio",
+      "quota_multiplier": "2",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
       "model": "deepseek-v4-pro",
       "pricing_pointer": "/deepseek-v4-pro/model_ratio",
       "quota_multiplier": "2",
       "unit": "token",
       "max_input_bytes": 1048576,
-      "max_output_tokens": 4096
+      "max_output_tokens": 4469
+    },
+    {
+      "task_type": "chat",
+      "model": "doubao-seed-2-0-pro-260215",
+      "pricing_pointer": "/doubao-seed-2-0-pro-260215/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 6763
+    },
+    {
+      "task_type": "chat",
+      "model": "gemini-3.1-flash-lite-preview",
+      "pricing_pointer": "/gemini-3.1-flash-lite-preview/model_ratio",
+      "quota_multiplier": "6",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
+      "model": "gemini-3.1-pro-preview",
+      "pricing_pointer": "/gemini-3.1-pro-preview/model_ratio",
+      "quota_multiplier": "4.5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 864
+    },
+    {
+      "task_type": "chat",
+      "model": "glm-5",
+      "pricing_pointer": "/glm-5/model_ratio",
+      "quota_multiplier": "3.2",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 4375
+    },
+    {
+      "task_type": "chat",
+      "model": "glm-5.1",
+      "pricing_pointer": "/glm-5.1/model_ratio",
+      "quota_multiplier": "3.142857142857",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 3181
+    },
+    {
+      "task_type": "chat",
+      "model": "glm-5.2",
+      "pricing_pointer": "/glm-5.2/model_ratio",
+      "quota_multiplier": "3.142857142857",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 3181
+    },
+    {
+      "task_type": "chat",
+      "model": "gpt-5.2",
+      "pricing_pointer": "/gpt-5.2/model_ratio",
+      "quota_multiplier": "8",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 1111
+    },
+    {
+      "task_type": "chat",
+      "model": "gpt-5.4",
+      "pricing_pointer": "/gpt-5.4/model_ratio",
+      "quota_multiplier": "6",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 1037
+    },
+    {
+      "task_type": "chat",
+      "model": "gpt-5.5",
+      "pricing_pointer": "/gpt-5.5/model_ratio",
+      "quota_multiplier": "6",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 518
+    },
+    {
+      "task_type": "chat",
+      "model": "gpt-5.6-luna",
+      "pricing_pointer": "/gpt-5.6-luna/model_ratio",
+      "quota_multiplier": "8",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 1750
+    },
+    {
+      "task_type": "chat",
+      "model": "gpt-5.6-sol",
+      "pricing_pointer": "/gpt-5.6-sol/model_ratio",
+      "quota_multiplier": "8",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 350
+    },
+    {
+      "task_type": "chat",
+      "model": "gpt-5.6-terra",
+      "pricing_pointer": "/gpt-5.6-terra/model_ratio",
+      "quota_multiplier": "8",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 700
+    },
+    {
+      "task_type": "chat",
+      "model": "grok-4",
+      "pricing_pointer": "/grok-4/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 518
+    },
+    {
+      "task_type": "chat",
+      "model": "grok-4-fast",
+      "pricing_pointer": "/grok-4-fast/model_ratio",
+      "quota_multiplier": "2.5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
+    },
+    {
+      "task_type": "chat",
+      "model": "kimi-k2.5",
+      "pricing_pointer": "/kimi-k2.5/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 5185
+    },
+    {
+      "task_type": "chat",
+      "model": "kimi-k2.6",
+      "pricing_pointer": "/kimi-k2.6/model_ratio",
+      "quota_multiplier": "4.210526315789",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 3888
+    },
+    {
+      "task_type": "chat",
+      "model": "moonshot/kimi-k2.5",
+      "pricing_pointer": "/moonshot~1kimi-k2.5/model_ratio",
+      "quota_multiplier": "5",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 5185
+    },
+    {
+      "task_type": "chat",
+      "model": "qwen3.5-plus",
+      "pricing_pointer": "/qwen3.5-plus/model_ratio",
+      "quota_multiplier": "6",
+      "unit": "token",
+      "max_input_bytes": 1048576,
+      "max_output_tokens": 8192
     }
   ]
 }

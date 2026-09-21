@@ -73,3 +73,14 @@ func TestPricingLooksUpModelByName(t *testing.T) {
 		t.Fatalf("Quote = %d, %v; want 2", n, err)
 	}
 }
+
+func TestPricingPointerEscapesSlash(t *testing.T) {
+	// Model names can contain "/" (e.g. deepseek-ai/DeepSeek-V3.2). The JSON
+	// pointer must escape it as ~1 and still resolve against normalizePricing.
+	pricing := json.RawMessage(`[{"model_name":"deepseek-ai/DeepSeek-V3.2","model_ratio":0.0135,"completion_ratio":1.5}]`)
+	r := Rule{TaskType: "chat", Model: "deepseek-ai/DeepSeek-V3.2", PricingPointer: "/deepseek-ai~1DeepSeek-V3.2/model_ratio", QuotaMultiplier: "1.5", Unit: "request", MaxInputBytes: 1000, MaxOutputTokens: 128}
+	n, err := (PricingService{}).Quote(pricing, r, map[string]any{}, 1)
+	if err != nil || n != 1 {
+		t.Fatalf("Quote = %d, %v; want 1", n, err)
+	}
+}
