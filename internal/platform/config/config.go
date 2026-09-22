@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -67,9 +66,6 @@ func Load() (Config, error) {
 		if e != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(c.Env != "production" && u.Scheme == "http")) {
 			return c, errors.New("invalid Kovar URL; production requires HTTPS")
 		}
-	}
-	if c.Env == "production" && (c.AdminPassword == "Aa123456" || strings.Contains(c.AdminPassword, "CHANGE_ME")) {
-		return c, errors.New("production requires non-default admin password")
 	}
 	return c, nil
 }

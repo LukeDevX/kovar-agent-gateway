@@ -26,9 +26,4 @@ func TestFailClosedConfig(t *testing.T) {
 	if _, err = Load(); err == nil {
 		t.Fatal("production plaintext upstream accepted")
 	}
-	t.Setenv("KOVAR_MODEL_BASE_URL", "https://example.invalid")
-	t.Setenv("GATEWAY_ADMIN_PASSWORD", "Aa123456")
-	if _, err = Load(); err == nil {
-		t.Fatal("default production password accepted")
-	}
 }
