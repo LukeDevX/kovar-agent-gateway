@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+deploy/production.env
 bin/
 coverage.out
 *.log

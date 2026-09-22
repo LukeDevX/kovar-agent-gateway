@@ -291,6 +291,9 @@ Migration 使用事务和 PostgreSQL advisory transaction lock。应用没有 Au
 
 Dockerfile 为多阶段构建、非 root 运行，运行层包含 CA 证书和二进制，不包含源码或 `.env`；显式 `--env-file` 注入配置。容器对外服务时将 `HTTP_ADDR` 配置成 `:8080`。
 
+Gateway、Admin Webside、PostgreSQL、Nginx 和 HTTPS 的 AWS EC2 完整部署步骤见
+[`deploy/README.md`](deploy/README.md)。
+
 ## Testing
 
 ```bash
