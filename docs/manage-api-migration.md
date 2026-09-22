@@ -44,7 +44,7 @@ Before migration:
 
 The masked token key is a functional breaking change. Pagination, explicit management authentication and pricing permissions require adapter validation even where paths are unchanged. No existing Gateway route or request field is renamed.
 
-Non-breaking additions used here: topup status, Axone chains and order. Keep Axone address (alias of order), wallets, PayGo sessions, callbacks, other providers, and conditional Turnstile login support for separate work. Do not add database tables, environment variables, helper operations, automatic wallet transfers or new infrastructure.
+Non-breaking additions used here: topup status, Axone chains and order. Keep Axone address (alias of order), callbacks, other providers, and conditional Turnstile login support for separate work. Axone wallets and PayGo sessions were subsequently added through the /api/v1/account/axone/wallets and /api/v1/account/paygo/sessions routes. Do not add database tables, environment variables, helper operations, automatic wallet transfers or new infrastructure.
 
 Implement client/mapper/service first, then the two new fixed read routes and existing history query mapping. Verify HTTP/business errors, malformed data, both credential types, user isolation, masked key retrieval, paging and payment/task idempotency using mock upstream plus isolated PostgreSQL tests.
 
@@ -94,4 +94,4 @@ Implement client/mapper/service first, then the two new fixed read routes and ex
 
 The existing local PostgreSQL container rejected the initial test connection. The completed integration run used a separate temporary local container from the already installed PostgreSQL image, with random credentials kept out of output and independent test schemas. The temporary container was removed afterward; no existing or remote database was changed. Every Kovar call in tests used httptest mocks. No live login, model charge, wallet transfer or payment was performed.
 
-Unconfirmed deployment behavior: whether the deployed controllers match this checkout, real pricing shape/units and account quota semantics, HeaderNavModules settings, Turnstile requirements, Axone enablement/chain/currency/minimums and settlement callbacks. Deferred capabilities are Axone address alias/wallets/PayGo, other payment providers, Turnstile integration, dashboard/admin model APIs and additional log pagination/filter adapters.
+Unconfirmed deployment behavior: whether the deployed controllers match this checkout, real pricing shape/units and account quota semantics, HeaderNavModules settings, Turnstile requirements, Axone enablement/chain/currency/minimums and settlement callbacks. Deferred capabilities are Axone address alias, other payment providers, Turnstile integration, dashboard/admin model APIs and additional log pagination/filter adapters.

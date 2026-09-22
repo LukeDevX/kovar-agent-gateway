@@ -85,7 +85,7 @@ type CreateTokenRequest struct {
 // request performs the HTTP round-trip and returns the decoded JSON body plus
 // any session cookie. Envelope validation is left to callers because a few
 // endpoints (token usage) use a different success field.
-func (c *KovarManageClient) request(ctx context.Context, method, path string, cred Credential, in any) (json.RawMessage, string, error) {
+func (c *KovarManageClient) request(ctx context.Context, method, path string, cred Credential, extra http.Header, in any) (json.RawMessage, string, error) {
 	var b []byte
 	var err error
 	if in != nil {
@@ -95,7 +95,13 @@ func (c *KovarManageClient) request(ctx context.Context, method, path string, cr
 		}
 	}
 	defer clear(b)
-	resp, err := c.http.Do(ctx, method, path, "application/json", b, cred.headers())
+	headers := cred.headers()
+	for k, vs := range extra {
+		for _, v := range vs {
+			headers.Set(k, v)
+		}
+	}
+	resp, err := c.http.Do(ctx, method, path, "application/json", b, headers)
 	if err != nil {
 		var status *upstream.HTTPError
 		if errors.As(err, &status) {
@@ -120,7 +126,11 @@ func (c *KovarManageClient) request(ctx context.Context, method, path string, cr
 }
 
 func (c *KovarManageClient) call(ctx context.Context, method, path string, cred Credential, in any) (Envelope, string, error) {
-	raw, session, err := c.request(ctx, method, path, cred, in)
+	return c.callHeaders(ctx, method, path, cred, nil, in)
+}
+
+func (c *KovarManageClient) callHeaders(ctx context.Context, method, path string, cred Credential, extra http.Header, in any) (Envelope, string, error) {
+	raw, session, err := c.request(ctx, method, path, cred, extra, in)
 	if err != nil {
 		return Envelope{}, "", err
 	}
@@ -266,7 +276,7 @@ func (c *KovarManageClient) DeleteToken(ctx context.Context, cred Credential, id
 	return err
 }
 func (c *KovarManageClient) Usage(ctx context.Context, key string) (json.RawMessage, error) {
-	raw, _, err := c.request(ctx, "GET", "/api/usage/token/", Credential{AccessToken: key}, nil)
+	raw, _, err := c.request(ctx, "GET", "/api/usage/token/", Credential{AccessToken: key}, nil, nil)
 	if err != nil {
 		return nil, err
 	}

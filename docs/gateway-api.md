@@ -36,6 +36,11 @@
 | GET | /api/v1/account/topup/status | Agent，必填 trade_no；仅绑定用户的订单 |
 | GET | /api/v1/account/topup/axone/chains | Agent，Axone 支持的链 |
 | POST | /api/v1/account/topup | Agent，provider/payload；Idempotency-Key；新增 axone，其他 provider 仍 NOT_SUPPORTED |
+| GET | /api/v1/account/axone/wallets | Agent，Axone 钱包列表；返回 `list[]`，其中 `id` 即 paygo 的 wallet_id |
+| POST | /api/v1/account/paygo/sessions | Agent，wallet_id/max_amount；Idempotency-Key；创建按量支付会话 |
+| GET | /api/v1/account/paygo/sessions | Agent，按量支付会话列表 |
+| GET | /api/v1/account/paygo/sessions/{id} | Agent，id 为 session_id（UUID），不是数值主键 |
+| POST | /api/v1/account/paygo/sessions/{id}/close | Agent，Idempotency-Key；关闭按量支付会话 |
 | GET | /api/v1/models | Agent 绑定用户的可用模型，响应仍为 `{data:[{id}]}` |
 | GET | /api/v1/pricing | Agent，管理 pricing data |
 | POST | /api/v1/tasks | Agent，task_type/model/payload；Idempotency-Key |
@@ -56,6 +61,44 @@ Axone 创建示例（链、币种、钱包地址由用户根据 topup info/chain
 ```
 
 创建只返回 pending 订单。查询 status 时原样返回 Kovar 的状态及金额，不将 paid/completed 等状态互相转换，不本地增加 quota。相同逻辑写操作重试须保持完全相同的 body 和 Idempotency-Key，并重新签名；上游不确定失败也不会重复创建订单。
+
+### 按量支付（Axone PayGo）调用流程
+
+按量支付依赖“已绑定的 Kovar 用户凭证”，所有接口均为 Agent 鉴权。完整流程如下：
+
+1. **绑定用户**（复用现有能力）：`POST /api/v1/kovar/auth/register` 或 `/login`（必要时 `/login/2fa`），把 Agent 绑定到 Kovar 用户并保存加密 Session。
+2. **获取钱包**：`GET /api/v1/account/axone/wallets`，响应 `data.list[]` 中每一项的 `id` 即 `wallet_id`，同时含 `currency`、`total_balance` 等字段。
+3. **创建会话**：`POST /api/v1/account/paygo/sessions`，请求体 `{"wallet_id":"...","max_amount":"1.00"}`，必须带 `Idempotency-Key`；返回 `session_id`（UUID）和 `status:"active"`。
+4. **查询**：`GET /api/v1/account/paygo/sessions`（列表）或 `GET /api/v1/account/paygo/sessions/{session_id}`（详情）。
+5. **关闭会话**：`POST /api/v1/account/paygo/sessions/{session_id}/close`，也必须带 `Idempotency-Key`；成功返回 `status:"closed"` 并写入 `closed_at`。
+
+关键契约：
+
+- `{id}` 一律使用 `session_id`（UUID），不是响应里的数值 `id`。
+- 创建与关闭都要求 `Idempotency-Key`（上游 close 同样校验，缺省会返回 400）。
+- `max_amount` 是十进制字符串；会话金额字段为 q8 定点整数（8 位小数），Gateway 原样透传、不本地结算。
+- 常见业务错误：402 会话不可用或预留额度不足、404 会话不存在、409 幂等键冲突、503 按量支付未启用。
+
+示例（省略 Agent 签名头）：
+
+```text
+# 1. 获取钱包，取 list[0].id 作为 wallet_id
+GET /api/v1/account/axone/wallets
+
+# 2. 创建会话
+POST /api/v1/account/paygo/sessions
+Idempotency-Key: paygo-create-001
+{"wallet_id":"<wallet_id>","max_amount":"1.00"}
+
+# 3. 详情（id 用返回的 session_id）
+GET /api/v1/account/paygo/sessions/<session_id>
+
+# 4. 关闭
+POST /api/v1/account/paygo/sessions/<session_id>/close
+Idempotency-Key: paygo-close-001
+```
+
+除上述 `GET /api/v1/account/axone/wallets` 与四个 paygo 会话接口外，按量支付不依赖其它尚未暴露的上游接口；`chains`、`topup/info` 属于预付（topup）流程，与 paygo 无关。
 
 管理错误映射：400 `KOVAR_INVALID_REQUEST`，401 `KOVAR_AUTH_FAILED`，403 `KOVAR_FORBIDDEN`（包括 pricing 模块关闭），404 `KOVAR_NOT_FOUND`，409 `KOVAR_CONFLICT`，429 `UPSTREAM_RATE_LIMITED`，5xx → 502 `UPSTREAM_ERROR`。HTTP 200 业务失败 → 502 `KOVAR_REQUEST_REJECTED`；订单不存在或不属于当前用户 → 404。响应结构异常返回 502，不直接透出上游消息。
 

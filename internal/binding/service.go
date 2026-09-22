@@ -454,6 +454,66 @@ func (s *Service) AxoneChains(ctx context.Context, a string) (json.RawMessage, e
 	return s.sanitizeData(ctx, a, c, data), nil
 }
 
+func (s *Service) AxoneWallets(ctx context.Context, a string) (json.RawMessage, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.manage.AxoneWallets(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
+}
+
+func (s *Service) CreatePaygoSession(ctx context.Context, a, key, walletID, maxAmount string) (json.RawMessage, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.manage.CreatePaygoSession(ctx, c, key, walletID, maxAmount)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
+}
+
+func (s *Service) ListPaygoSessions(ctx context.Context, a string) (json.RawMessage, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.manage.ListPaygoSessions(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
+}
+
+func (s *Service) GetPaygoSession(ctx context.Context, a, id string) (json.RawMessage, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.manage.GetPaygoSession(ctx, c, id)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
+}
+
+func (s *Service) ClosePaygoSession(ctx context.Context, a, id, key string) (json.RawMessage, error) {
+	c, err := s.Credential(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.manage.ClosePaygoSession(ctx, c, id, key)
+	if err != nil {
+		return nil, err
+	}
+	return s.sanitizeData(ctx, a, c, data), nil
+}
+
 func (s *Service) sanitizeData(ctx context.Context, a string, c kovarmanage.Credential, data json.RawMessage) json.RawMessage {
 	secrets := []string{c.Session, c.AccessToken}
 	if key, _, err := s.Key(ctx, a); err == nil {

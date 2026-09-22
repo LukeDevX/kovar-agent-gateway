@@ -42,6 +42,7 @@ type mockKovar struct {
 	lastExpiry       atomic.Int64
 	topups           atomic.Int32
 	topupFailure     atomic.Int32
+	paygo            atomic.Int32
 	userModels       atomic.Int32
 	keyModels        atomic.Int32
 	deletes          atomic.Int32
@@ -158,6 +159,8 @@ func (m *mockKovar) serve(w http.ResponseWriter, r *http.Request) {
 		send(map[string]any{"trade_no": "AXONE-7-test", "status": "pending", "amount": 10, "money": json.Number("10.01"), "session": "fixture-user-7"})
 	case r.URL.Path == "/api/user/axone/chains":
 		send([]any{map[string]string{"chain_id": "fixture-chain"}})
+	case r.URL.Path == "/api/user/axone/wallets":
+		send(map[string]any{"total": 1, "current": 1, "list": []any{map[string]any{"id": "fixture-wallet", "currency": "USDC", "amount": 100, "total_balance": 100}}})
 	case r.URL.Path == "/api/user/axone/order":
 		m.topups.Add(1)
 		if status := m.topupFailure.Load(); status != 0 {
@@ -165,6 +168,37 @@ func (m *mockKovar) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		send(map[string]any{"trade_no": "AXONE-7-test", "address": "fixture-payment-address", "status": "pending", "payment_money": "10.01", "access_token": "do-not-return"})
+	case r.URL.Path == "/api/user/axone/paygo/sessions" && r.Method == "POST":
+		m.paygo.Add(1)
+		if r.Header.Get("Idempotency-Key") == "" {
+			w.WriteHeader(400)
+			fmt.Fprint(w, `{"success":false,"message":"Idempotency-Key is required"}`)
+			return
+		}
+		var in struct {
+			WalletID  string `json:"wallet_id"`
+			MaxAmount string `json:"max_amount"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		send(map[string]any{"id": 3, "session_id": "fixture-session", "wallet_id": in.WalletID, "currency": "USDC", "status": "active", "reserved_q8": 100000000})
+	case r.URL.Path == "/api/user/axone/paygo/sessions" && r.Method == "GET":
+		send([]any{map[string]any{"id": 3, "session_id": "fixture-session", "status": "active"}})
+	case strings.HasPrefix(r.URL.Path, "/api/user/axone/paygo/sessions/"):
+		if !strings.HasSuffix(r.URL.Path, "/fixture-session") && r.Method != "POST" {
+			w.WriteHeader(404)
+			fmt.Fprint(w, `{"success":false,"message":"AXOne PayGo session not found"}`)
+			return
+		}
+		if r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/close") {
+			if r.Header.Get("Idempotency-Key") == "" {
+				w.WriteHeader(400)
+				fmt.Fprint(w, `{"success":false,"message":"Idempotency-Key is required"}`)
+				return
+			}
+			send(map[string]any{"id": 3, "session_id": "fixture-session", "status": "closed"})
+			return
+		}
+		send(map[string]any{"id": 3, "session_id": "fixture-session", "status": "active"})
 	case r.URL.Path == "/api/log/self/stat" || r.URL.Path == "/api/user/topup/info":
 		send(map[string]any{})
 	case r.URL.Path == "/v1/models":

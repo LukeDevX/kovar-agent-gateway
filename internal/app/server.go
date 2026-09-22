@@ -238,6 +238,28 @@ func (s *Server) Handler() http.Handler {
 	route("GET /api/v1/account/topup/axone/chains", "agent", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
 		return s.Service.Binding.AxoneChains(r.Context(), i.Agent)
 	})
+	route("GET /api/v1/account/axone/wallets", "agent", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
+		return s.Service.Binding.AxoneWallets(r.Context(), i.Agent)
+	})
+	route("POST /api/v1/account/paygo/sessions", "agent", s.idempotent("paygo-create", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
+		var in struct {
+			WalletID  string `json:"wallet_id"`
+			MaxAmount string `json:"max_amount"`
+		}
+		if err := httpx.Decode(i.Body, &in); err != nil {
+			return nil, err
+		}
+		return s.Service.Binding.CreatePaygoSession(r.Context(), i.Agent, r.Header.Get("Idempotency-Key"), in.WalletID, in.MaxAmount)
+	}))
+	route("GET /api/v1/account/paygo/sessions", "agent", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
+		return s.Service.Binding.ListPaygoSessions(r.Context(), i.Agent)
+	})
+	route("GET /api/v1/account/paygo/sessions/{id}", "agent", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
+		return s.Service.Binding.GetPaygoSession(r.Context(), i.Agent, r.PathValue("id"))
+	})
+	route("POST /api/v1/account/paygo/sessions/{id}/close", "agent", s.idempotent("paygo-close", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
+		return s.Service.Binding.ClosePaygoSession(r.Context(), i.Agent, r.PathValue("id"), r.Header.Get("Idempotency-Key"))
+	}))
 	route("POST /api/v1/account/topup", "agent", s.idempotent("topup", func(_ http.ResponseWriter, r *http.Request, i input) (any, error) {
 		var in struct {
 			Provider string          `json:"provider"`

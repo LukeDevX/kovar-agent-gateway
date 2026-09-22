@@ -189,7 +189,7 @@ message := "Kovar Agent Gateway\nAction: Request\n" +
 
 ## Kovar Manage API
 
-当前事实来源为 [`new-kovar-manage-api.json`](new-kovar-manage-api.json)，旧版 `kovar-manage-api.json` 保留用于比较。Client 覆盖注册、登录、2FA、self、Token create/search/get/key/delete、`/api/usage/token/`、pricing、ratio config、data self、用户模型、topup info/history/status、Axone chains/order、个人 logs/stat、个人 Kovar task 查询。完整差异和补充源码依据见 [迁移矩阵](docs/manage-api-migration.md)。
+当前事实来源为 [`new-kovar-manage-api.json`](new-kovar-manage-api.json)，旧版 `kovar-manage-api.json` 保留用于比较。Client 覆盖注册、登录、2FA、self、Token create/search/get/key/delete、`/api/usage/token/`、pricing、ratio config、data self、用户模型、topup info/history/status、Axone chains/order、Axone wallets、Axone PayGo sessions（创建/列表/详情/关闭）、个人 logs/stat、个人 Kovar task 查询。完整差异和补充源码依据见 [迁移矩阵](docs/manage-api-migration.md)。
 
 管理认证为 Session Cookie 或管理 Access Token，并携带 `New-Api-User`。模型 Token usage 使用 `Authorization`，不使用 `/api/log/token?key=`。
 
@@ -326,7 +326,7 @@ make test-integration  # 使用 .env 的数据库，含 go test -race ./...
 
 1. 新版 Manage 多数响应仍只有 ApiResponse，data 未详细定义；用户模型、分页、充值状态和 Axone 的最小字段依据同级上游源码确认，其他字段保留可脱敏的 raw JSON。实际部署不符合时返回 `KOVAR_CONTRACT_INCOMPLETE`，没有把 mock 当生产验证。
 2. pricing／ratio config／Token usage／data self／日志统计字段缺失。默认路由为空且收费请求 fail closed；price pointer 和 quota 换算须由部署方确认。实际费用无法确认时永远 NULL。
-3. epay、stripe、creem 新版已有请求 schema，但其 provider adapter 本次未接入，继续返回 NOT_SUPPORTED；Axone wallets/PayGo、address 别名和支付回调暂不公开。Gateway 不执行钱包转账或自行结算。
+3. epay、stripe、creem 新版已有请求 schema，但其 provider adapter 本次未接入，继续返回 NOT_SUPPORTED；Axone address 别名和支付回调暂不公开；Axone wallets 与 PayGo 会话已通过 /api/v1/account/axone/wallets、/api/v1/account/paygo/sessions 系列公开。Gateway 不执行钱包转账或自行结算。
 4. 完整模型 Key 通过新版 key endpoint 获取，失败进入 reconciliation 状态。网络超时、进程崩溃或上游成功而本地写入失败，可能留下 CREATING/UNKNOWN 或 RUNNING；需用已记录 Agent/Token name/provider_task_id 在 Kovar 核实后处理。充值结果不确定时也必须核实订单，禁止通过清除幂等记录盲目重发收费请求。
 5. 预算是预检查。多个 Agent 共用同一 Kovar 用户、外部使用账户、实际费用超估算及上游未知扣费会影响真实余额；Kovar 执行最终计费。Gateway 不保证上游原子余额预留。
 6. Suspend/Revoke 阻止新准入；已提交给上游的请求不能通过未记载的取消接口撤销。视频以 GET Task 按需轮询，无后台自动重试收费请求。

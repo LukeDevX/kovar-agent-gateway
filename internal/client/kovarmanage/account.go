@@ -3,7 +3,9 @@ package kovarmanage
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -89,6 +91,20 @@ func (c *KovarManageClient) AxoneChains(ctx context.Context, cred Credential) (j
 	return e.Data, nil
 }
 
+func (c *KovarManageClient) AxoneWallets(ctx context.Context, cred Credential) (json.RawMessage, error) {
+	e, _, err := c.call(ctx, "GET", "/api/user/axone/wallets", cred, nil)
+	if err != nil {
+		return nil, err
+	}
+	var wallets struct {
+		List []json.RawMessage `json:"list"`
+	}
+	if json.Unmarshal(e.Data, &wallets) != nil || wallets.List == nil {
+		return nil, httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "Axone wallet data lacks a list array")
+	}
+	return e.Data, nil
+}
+
 type axoneOrderRequest struct {
 	Amount               int64  `json:"amount"`
 	Currency             string `json:"currency"`
@@ -123,6 +139,101 @@ func (c *KovarManageClient) axoneOrder(ctx context.Context, cred Credential, pay
 	}
 	if order.Status != "pending" {
 		return nil, httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "unexpected Axone order creation status; query order status")
+	}
+	return e.Data, nil
+}
+
+type paygoSessionRequest struct {
+	WalletID  string `json:"wallet_id"`
+	MaxAmount string `json:"max_amount"`
+}
+
+var paygoAmount = regexp.MustCompile(`^[0-9]{1,32}(\.[0-9]{1,18})?$`)
+
+func validPaygoAmount(value string) bool {
+	if !paygoAmount.MatchString(value) {
+		return false
+	}
+	for _, r := range value {
+		if r >= '1' && r <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+func validPaygoSession(data json.RawMessage) error {
+	var session struct {
+		SessionID string `json:"session_id"`
+		Status    string `json:"status"`
+	}
+	if json.Unmarshal(data, &session) != nil || !boundedText(session.SessionID, 128) || strings.TrimSpace(session.Status) == "" {
+		return httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "Axone paygo session lacks session_id/status")
+	}
+	return nil
+}
+
+func validPaygoSessionList(data json.RawMessage) error {
+	var items []json.RawMessage
+	if json.Unmarshal(data, &items) != nil {
+		return httpx.E(502, "KOVAR_CONTRACT_INCOMPLETE", "Axone paygo session list must be an array")
+	}
+	return nil
+}
+
+func (c *KovarManageClient) CreatePaygoSession(ctx context.Context, cred Credential, key, walletID, maxAmount string) (json.RawMessage, error) {
+	if !boundedText(walletID, 256) || !validPaygoAmount(maxAmount) {
+		return nil, httpx.Invalid("paygo session requires wallet_id and a positive decimal max_amount")
+	}
+	headers := http.Header{}
+	headers.Set("Idempotency-Key", key)
+	e, _, err := c.callHeaders(ctx, "POST", "/api/user/axone/paygo/sessions", cred, headers, paygoSessionRequest{WalletID: walletID, MaxAmount: maxAmount})
+	if err != nil {
+		return nil, err
+	}
+	if err := validPaygoSession(e.Data); err != nil {
+		return nil, err
+	}
+	return e.Data, nil
+}
+
+func (c *KovarManageClient) ListPaygoSessions(ctx context.Context, cred Credential) (json.RawMessage, error) {
+	e, _, err := c.call(ctx, "GET", "/api/user/axone/paygo/sessions", cred, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := validPaygoSessionList(e.Data); err != nil {
+		return nil, err
+	}
+	return e.Data, nil
+}
+
+func (c *KovarManageClient) GetPaygoSession(ctx context.Context, cred Credential, id string) (json.RawMessage, error) {
+	if !httpx.Identifier(id) {
+		return nil, httpx.Invalid("paygo session id is required and must be a safe identifier")
+	}
+	e, _, err := c.call(ctx, "GET", "/api/user/axone/paygo/sessions/"+id, cred, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := validPaygoSession(e.Data); err != nil {
+		return nil, err
+	}
+	return e.Data, nil
+}
+
+func (c *KovarManageClient) ClosePaygoSession(ctx context.Context, cred Credential, id, key string) (json.RawMessage, error) {
+	if !httpx.Identifier(id) {
+		return nil, httpx.Invalid("paygo session id is required and must be a safe identifier")
+	}
+	headers := http.Header{}
+	headers.Set("Idempotency-Key", key)
+	e, _, err := c.callHeaders(ctx, "POST", "/api/user/axone/paygo/sessions/"+id+"/close", cred, headers, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := validPaygoSession(e.Data); err != nil {
+		return nil, err
 	}
 	return e.Data, nil
 }
